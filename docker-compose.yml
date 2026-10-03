@@ -1,0 +1,46 @@
+# A real 3-node cluster: one container per node, each with its own volume.
+#   docker compose up -d --build
+#   curl -X PUT -d world localhost:8081/kv/hello
+#   curl localhost:8082/kv/hello
+#   ./scripts/chaos.sh
+x-node: &node
+  build: .
+  restart: "no"
+  healthcheck:
+    test: ["CMD", "curl", "-fs", "http://localhost:8080/healthz"]
+    interval: 2s
+    timeout: 1s
+    retries: 10
+
+services:
+  n1:
+    <<: *node
+    command: ["raftkv", "node", "-id", "n1", "-listen", ":8080", "-data", "/data",
+              "-peers", "n1=http://n1:8080,n2=http://n2:8080,n3=http://n3:8080"]
+    ports: ["8081:8080"]
+    volumes: ["n1-data:/data"]
+  n2:
+    <<: *node
+    command: ["raftkv", "node", "-id", "n2", "-listen", ":8080", "-data", "/data",
+              "-peers", "n1=http://n1:8080,n2=http://n2:8080,n3=http://n3:8080"]
+    ports: ["8082:8080"]
+    volumes: ["n2-data:/data"]
+  n3:
+    <<: *node
+    command: ["raftkv", "node", "-id", "n3", "-listen", ":8080", "-data", "/data",
+              "-peers", "n1=http://n1:8080,n2=http://n2:8080,n3=http://n3:8080"]
+    ports: ["8083:8080"]
+    volumes: ["n3-data:/data"]
+
+  # Optional: Prometheus scraping every node's /metrics.
+  #   docker compose --profile metrics up -d   ->  http://localhost:9090
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    profiles: ["metrics"]
+    volumes: ["./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    ports: ["9090:9090"]
+
+volumes:
+  n1-data:
+  n2-data:
+  n3-data:

@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RaftKV · Live Cluster</title>
+<meta name="description" content="A fault-tolerant key-value store built on Raft. Kill the leader and watch the cluster recover.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='8' r='5' fill='%234f46e5'/><circle cx='7' cy='24' r='5' fill='%23a8a29e'/><circle cx='25' cy='24' r='5' fill='%23a8a29e'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --surface-2: #f3f3f0;
+  --border: #e7e5e4;
+  --text: #1c1917;
+  --text-2: #57534e;
+  --text-3: #a8a29e;
+  --accent: #4f46e5;
+  --accent-ink: #ffffff;
+  --leader: #16a34a;
+  --candidate: #d97706;
+  --follower: #78716c;
+  --down: #e11d48;
+  --partition: #0891b2;
+  --shadow: 0 1px 2px rgb(28 25 23 / .04), 0 1px 3px rgb(28 25 23 / .06);
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c0c0d;
+    --surface: #151517;
+    --surface-2: #1c1c1f;
+    --border: #27272a;
+    --text: #fafafa;
+    --text-2: #a1a1aa;
+    --text-3: #71717a;
+    --accent: #818cf8;
+    --accent-ink: #0c0c0d;
+    --leader: #4ade80;
+    --candidate: #fbbf24;
+    --follower: #a1a1aa;
+    --down: #fb7185;
+    --partition: #22d3ee;
+    --shadow: none;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--sans); -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px 56px; }
+
+/* top bar */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 0; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
+.brand svg { display: block; }
+.brand small { font-weight: 500; color: var(--text-3); font-size: 13px; }
+.top a { color: var(--text-2); text-decoration: none; font-weight: 500; font-size: 13px; }
+.top a:hover { color: var(--text); }
+
+.intro { margin: 8px 0 24px; max-width: 620px; }
+.intro h1 { font-size: 28px; line-height: 1.2; letter-spacing: -0.025em; margin: 0 0 8px; font-weight: 700; }
+.intro p { margin: 0; color: var(--text-2); font-size: 15px; }
+
+/* surfaces */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
+.section-title { font-size: 12px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .07em; margin: 0 0 14px; }
+.pad { padding: 18px; }
+
+/* summary strip */
+.summary { display: grid; grid-template-columns: repeat(5, 1fr); margin-bottom: 16px; }
+.summary > div { padding: 14px 18px; border-left: 1px solid var(--border); min-width: 0; }
+.summary > div:first-child { border-left: 0; }
+.summary .label { font-size: 12px; color: var(--text-3); font-weight: 500; }
+.summary .value { font: 600 20px/1.3 var(--mono); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.summary .value small { font-size: 12px; color: var(--text-3); font-weight: 500; margin-left: 2px; }
+@media (max-width: 760px) {
+  .summary { grid-template-columns: repeat(2, 1fr); }
+  .summary > div { border-left: 0; border-top: 1px solid var(--border); }
+  .summary > div:nth-child(-n+2) { border-top: 0; }
+  .summary > div:nth-child(even) { border-left: 1px solid var(--border); }
+  .summary > div:last-child { grid-column: 1 / -1; border-left: 0; }
+}
+
+/* layout */
+.cluster { display: grid; grid-template-columns: 300px 1fr; gap: 16px; margin-bottom: 16px; }
+.nodes { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.stack { display: grid; gap: 16px; }
+@media (max-width: 900px) {
+  .cluster, .split { grid-template-columns: 1fr; }
+}
+
+/* topology */
+.topo svg { width: 100%; height: auto; display: block; }
+.topo .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 12px; color: var(--text-2); }
+.edge { stroke-width: 2; fill: none; transition: stroke .3s; }
+.edge.live { stroke: var(--accent); stroke-dasharray: 4 6; animation: flow 0.9s linear infinite; }
+.edge.broken { stroke: var(--down); stroke-dasharray: 2 5; opacity: .6; }
+.edge.idle { stroke: var(--border); }
+@keyframes flow { to { stroke-dashoffset: -20; } }
+@media (prefers-reduced-motion: reduce) { .edge.live { animation: none; } }
+
+/* node cards */
+.node { padding: 16px; display: flex; flex-direction: column; gap: 14px; transition: border-color .25s, box-shadow .25s; }
+.node.is-leader { border-color: color-mix(in srgb, var(--leader) 55%, var(--border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--leader) 12%, transparent); }
+.node.is-down { background: var(--surface-2); }
+.node.is-partition { border-style: dashed; border-color: var(--partition); }
+.node-head { display: flex; align-items: center; justify-content: space-between; }
+.node-id { font: 600 18px var(--mono); }
+.badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 3px 9px 3px 8px; border-radius: 999px; color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent); }
+.badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.c-leader { --c: var(--leader); } .c-candidate { --c: var(--candidate); } .c-follower { --c: var(--follower); }
+.c-down { --c: var(--down); } .c-partition { --c: var(--partition); }
+.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; margin: 0; }
+.metrics dt { font-size: 12px; color: var(--text-3); }
+.metrics dd { margin: 0; font: 500 15px var(--mono); }
+.progress { display: grid; gap: 6px; }
+.progress .row { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-3); }
+.track { height: 4px; border-radius: 2px; background: var(--surface-2); position: relative; overflow: hidden; }
+.track i { position: absolute; inset: 0 auto 0 0; border-radius: 2px; background: var(--leader); transition: width .35s ease; }
+.node-actions { display: flex; gap: 8px; margin-top: auto; }
+
+/* controls */
+button { font: 500 13px var(--sans); border-radius: 8px; padding: 7px 12px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); transition: background .15s, border-color .15s; }
+button:hover { background: var(--surface-2); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+button.primary:hover { background: color-mix(in srgb, var(--accent) 88%, black); }
+button.danger { color: var(--down); }
+button.flex { flex: 1; }
+input, select { font: 13px var(--mono); padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); min-width: 0; width: 100%; }
+.field { display: grid; gap: 4px; font-size: 12px; color: var(--text-3); font-weight: 500; }
+.form-row { display: grid; gap: 10px; margin-bottom: 12px; }
+.cols-2 { grid-template-columns: 1fr 1fr; }
+.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.output { margin-top: 12px; font: 12px/1.6 var(--mono); background: var(--surface-2); border-radius: 8px; padding: 12px; white-space: pre-wrap; word-break: break-word; color: var(--text-2); min-height: 48px; }
+.output .status { font-weight: 600; }
+.ok { color: var(--leader); } .err { color: var(--down); }
+
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border-radius: 8px; overflow: hidden; margin-top: 14px; border: 1px solid var(--border); }
+.kpis div { background: var(--surface); padding: 10px 12px; }
+.kpis b { display: block; font: 600 18px var(--mono); }
+.kpis span { font-size: 11px; color: var(--text-3); }
+@media (max-width: 480px) { .kpis { grid-template-columns: 1fr 1fr; } .cols-3 { grid-template-columns: 1fr 1fr; } }
+.hint { margin: 12px 0 0; font-size: 12px; color: var(--text-3); }
+
+/* steps */
+.steps { list-style: none; margin: 0; padding: 0; counter-reset: s; display: grid; gap: 10px; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 22px 1fr; gap: 10px; color: var(--text-2); font-size: 13px; }
+.steps li::before { content: counter(s); width: 22px; height: 22px; border-radius: 50%; background: var(--surface-2); color: var(--text-2); font: 600 11px/22px var(--mono); text-align: center; }
+.steps b { color: var(--text); font-weight: 600; }
+
+/* events */
+.events { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow-y: auto; }
+.events li { display: grid; grid-template-columns: 78px 10px 28px 1fr; align-items: baseline; gap: 8px; padding: 7px 0; border-top: 1px solid var(--border); font-size: 13px; }
+.events li:first-child { border-top: 0; }
+.events time { font: 11px var(--mono); color: var(--text-3); }
+.events .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--text-3)); align-self: center; }
+.events .who { font: 600 12px var(--mono); }
+.events .what { color: var(--text-2); min-width: 0; }
+.events .what b { color: var(--c, var(--text)); font-weight: 600; }
+.empty { color: var(--text-3); font-size: 13px; }
+
+footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; color: var(--text-3); font-size: 12px; }
+footer a { color: var(--text-2); }
+.flash { animation: flash 1.2s ease-out; }
+@keyframes flash { from { box-shadow: 0 0 0 8px color-mix(in srgb, var(--leader) 35%, transparent); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="top">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="8" r="5" fill="var(--accent)"/><circle cx="7" cy="24" r="5" fill="var(--text-3)"/><circle cx="25" cy="24" r="5" fill="var(--text-3)"/><path d="M14 12 9 20M18 12l5 8" stroke="var(--text-3)" stroke-width="1.6"/></svg>
+      RaftKV <small>live cluster</small>
+    </div>
+    <a href="https://github.com/Lecrupus/raftkv" target="_blank" rel="noopener">GitHub ↗</a>
+  </nav>
+
+  <div class="intro">
+    <h1>Break it and watch it heal.</h1>
+    <p>A distributed key-value store where every write is agreed on by a majority via Raft. Kill nodes or cut them off from the network: the cluster re-elects a leader and never loses a committed write.</p>
+  </div>
+
+  <section class="card summary" aria-label="Cluster summary">
+    <div><div class="label">Leader</div><div class="value" id="sLeader">–</div></div>
+    <div><div class="label">Term</div><div class="value" id="sTerm">–</div></div>
+    <div><div class="label">Nodes up</div><div class="value" id="sUp">–</div></div>
+    <div><div class="label">Committed entries</div><div class="value" id="sCommit">–</div></div>
+    <div><div class="label">Last failover</div><div class="value" id="sFail">–</div></div>
+  </section>
+
+  <section class="cluster">
+    <div class="card pad topo">
+      <h2 class="section-title">Topology</h2>
+      <svg id="topo" viewBox="40 12 220 200" role="img" aria-label="Cluster topology"></svg>
+      <div class="legend">
+        <span class="badge c-leader">leader</span>
+        <span class="badge c-follower">follower</span>
+        <span class="badge c-candidate">candidate</span>
+        <span class="badge c-partition">partitioned</span>
+        <span class="badge c-down">down</span>
+      </div>
+    </div>
+    <div class="nodes" id="nodes"></div>
+  </section>
+
+  <section class="split">
+    <div class="stack">
+      <div class="card pad">
+        <h2 class="section-title">Key-value API</h2>
+        <div class="form-row cols-2">
+          <label class="field">Key<input id="key" value="hello" autocomplete="off"></label>
+          <label class="field">Value<input id="val" value="world" autocomplete="off"></label>
+        </div>
+        <div class="btn-row">
+          <button class="primary" data-op="PUT">Put</button>
+          <button data-op="GET">Get</button>
+          <button data-op="GET_STALE" title="Read a replica's local copy without going through consensus">Get (stale)</button>
+          <button class="danger" data-op="DELETE">Delete</button>
+        </div>
+        <div class="output" id="kvOut">Writes return only after a majority has them on disk.</div>
+      </div>
+
+      <div class="card pad">
+        <h2 class="section-title">Benchmark</h2>
+        <div class="form-row cols-3">
+          <label class="field">Operations<input id="bOps" type="number" value="1000" min="1" max="5000"></label>
+          <label class="field">Clients<input id="bClients" type="number" value="16" min="1" max="32"></label>
+          <label class="field">Read mix<select id="bReads"><option value="0">0% reads</option><option value="0.5">50% reads</option><option value="0.9">90% reads</option></select></label>
+        </div>
+        <button class="primary" id="bRun" style="width:100%">Run benchmark</button>
+        <div class="kpis">
+          <div><b id="bTput">–</b><span>ops / sec</span></div>
+          <div><b id="bP50">–</b><span>p50 ms</span></div>
+          <div><b id="bP99">–</b><span>p99 ms</span></div>
+          <div><b id="bErr">–</b><span>errors</span></div>
+        </div>
+        <p class="hint">Concurrent clients over real HTTP. Every write is fsynced to a majority's WAL before the reply. Try killing the leader mid-run.</p>
+      </div>
+    </div>
+
+    <div class="stack">
+      <div class="card pad">
+        <h2 class="section-title">Try this</h2>
+        <ol class="steps">
+          <li><span><b>Kill the leader.</b> A follower times out and wins an election in a few hundred ms.</span></li>
+          <li><span><b>Write a key</b> while it's down. Two of three nodes is still a majority.</span></li>
+          <li><span><b>Start it again.</b> It replays its WAL from disk and catches up from the new leader.</span></li>
+          <li><span><b>Partition the leader.</b> It can't reach a majority, so it steps down. No split-brain.</span></li>
+          <li><span><b>Kill two nodes.</b> Writes stall rather than return wrong data. Consistency over availability.</span></li>
+        </ol>
+      </div>
+      <div class="card pad">
+        <h2 class="section-title">Event log</h2>
+        <ul class="events" id="events"><li class="empty">Waiting for events…</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Raft consensus · write-ahead log · Pre-Vote · linearizable reads · idempotent retries · Go, zero dependencies</span>
+    <a href="https://github.com/Lecrupus/raftkv" target="_blank" rel="noopener">Source on GitHub</a>
+  </footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const ROLE_LABEL = { leader: "Leader", follower: "Follower", candidate: "Candidate", down: "Down", partition: "Partitioned" };
+const EVENT_COLOR = { leader: "leader", election: "candidate", killed: "down", stepdown: "down", isolated: "partition", healed: "partition", started: "follower", follower: "follower" };
+let lastLeader = null;
+const cards = {};
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, opts);
+  const text = await r.text();
+  let body; try { body = JSON.parse(text); } catch { body = text; }
+  return { status: r.status, body };
+}
+
+function roleOf(n) {
+  if (!n.up) return "down";
+  if (n.status.isolated) return "partition";
+  return n.status.role;
+}
+
+// Build each node card once; later polls only update text and classes, so
+// buttons don't flicker or swallow clicks.
+function ensureCard(n) {
+  if (cards[n.id]) return cards[n.id];
+  const el = document.createElement("article");
+  el.className = "card node";
+  el.innerHTML = `
+    <div class="node-head"><span class="node-id">${n.id}</span><span class="badge" data-f="badge"></span></div>
+    <dl class="metrics">
+      <div><dt>Term</dt><dd data-f="term"></dd></div>
+      <div><dt>Keys</dt><dd data-f="keys"></dd></div>
+      <div><dt>Commit index</dt><dd data-f="commit"></dd></div>
+      <div><dt>Log index</dt><dd data-f="log"></dd></div>
+    </dl>
+    <div class="progress">
+      <div class="row"><span>Caught up</span><span data-f="pct"></span></div>
+      <div class="track"><i data-f="bar"></i></div>
+    </div>
+    <div class="node-actions">
+      <button class="flex" data-f="power"></button>
+      <button class="flex" data-f="net"></button>
+    </div>`;
+  const f = (k) => el.querySelector(`[data-f="${k}"]`);
+  const c = { el, badge: f("badge"), term: f("term"), keys: f("keys"), commit: f("commit"), log: f("log"), pct: f("pct"), bar: f("bar"), power: f("power"), net: f("net"), state: null };
+  c.power.addEventListener("click", () => act(n.id, c.state.up ? "kill" : "start", c.power));
+  c.net.addEventListener("click", () => act(n.id, c.state.isolated ? "heal" : "isolate", c.net));
+  $("nodes").appendChild(el);
+  return (cards[n.id] = c);
+}
+
+function updateCard(n, maxCommit) {
+  const c = ensureCard(n);
+  const s = n.status || {};
+  const role = roleOf(n);
+  c.state = { up: n.up, isolated: !!s.isolated };
+  c.el.classList.toggle("is-leader", role === "leader");
+  c.el.classList.toggle("is-down", role === "down");
+  c.el.classList.toggle("is-partition", role === "partition");
+  c.badge.className = "badge c-" + role;
+  c.badge.textContent = ROLE_LABEL[role] || role;
+  const dash = "–";
+  c.term.textContent = n.up ? s.term : dash;
+  c.keys.textContent = n.up ? s.kv.keys : dash;
+  c.commit.textContent = n.up ? s.commitIndex : dash;
+  c.log.textContent = n.up ? s.lastLogIndex : dash;
+  const pct = n.up && maxCommit ? Math.min(100, Math.round(100 * s.commitIndex / maxCommit)) : 0;
+  c.pct.textContent = n.up ? pct + "%" : "offline";
+  c.bar.style.width = pct + "%";
+  c.power.textContent = n.up ? "Kill" : "Start";
+  c.power.className = "flex " + (n.up ? "danger" : "primary");
+  c.net.textContent = s.isolated ? "Heal network" : "Partition";
+  c.net.disabled = !n.up;
+}
+
+function drawTopology(v) {
+  const svg = $("topo");
+  const N = v.nodes.length, cx = 150, cy = 108, R = 66;
+  const pos = v.nodes.map((n, i) => {
+    const a = -Math.PI / 2 + (2 * Math.PI * i) / N;
+    return { n, x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) };
+  });
+  const color = (role) => `var(--${role === "partition" ? "partition" : role})`;
+  let edges = "", nodes = "";
+  for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) {
+    const a = pos[i], b = pos[j];
+    const ids = [a.n.id, b.n.id];
+    const live = ids.includes(v.leader);
+    const broken = [a.n, b.n].some(n => roleOf(n) === "down" || roleOf(n) === "partition");
+    const cls = broken ? "broken" : live ? "live" : "idle";
+    // draw heartbeat edges from the leader outward so the dash flows away from it
+    const [p, q] = b.n.id === v.leader ? [b, a] : [a, b];
+    edges += `<line class="edge ${cls}" x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}"/>`;
+  }
+  for (const p of pos) {
+    const role = roleOf(p.n);
+    const isL = p.n.id === v.leader;
+    nodes += `
+      ${isL ? `<circle cx="${p.x}" cy="${p.y}" r="31" fill="none" stroke="${color(role)}" stroke-opacity=".25" stroke-width="6"/>` : ""}
+      <circle cx="${p.x}" cy="${p.y}" r="25" fill="var(--surface)" stroke="${color(role)}" stroke-width="2" ${role === "partition" ? 'stroke-dasharray="4 3"' : ""}/>
+      <text x="${p.x}" y="${p.y + 1}" text-anchor="middle" dominant-baseline="middle" font-family="var(--mono)" font-size="13" font-weight="600" fill="${role === "down" ? "var(--text-3)" : "var(--text)"}">${p.n.id}</text>
+      <text x="${p.x}" y="${p.y + 40}" text-anchor="middle" font-family="var(--sans)" font-size="10" font-weight="600" fill="${color(role)}">${(ROLE_LABEL[role] || role).toUpperCase()}</text>`;
+  }
+  svg.innerHTML = edges + nodes;
+}
+
+function fmtTime(t) {
+  const d = new Date(t);
+  return d.toLocaleTimeString([], { hour12: false }) + "." + String(d.getMilliseconds()).padStart(3, "0");
+}
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+let lastEventKey = "";
+function render(v) {
+  const up = v.nodes.filter(n => n.up);
+  const maxCommit = Math.max(1, ...up.map(n => n.status.commitIndex));
+  v.nodes.forEach(n => updateCard(n, maxCommit));
+  drawTopology(v);
+
+  const leader = v.nodes.find(n => n.id === v.leader);
+  $("sLeader").innerHTML = v.leader ? esc(v.leader) : `<small>electing…</small>`;
+  $("sTerm").textContent = leader ? leader.status.term : "–";
+  $("sUp").innerHTML = `${up.length}<small>/ ${v.nodes.length}</small>`;
+  $("sCommit").textContent = leader ? leader.status.commitIndex : maxCommit;
+  const fo = v.failovers || [];
+  $("sFail").innerHTML = fo.length ? `${Math.round(fo[fo.length - 1].ms)}<small>ms</small>` : "–";
+
+  if (v.leader && lastLeader && v.leader !== lastLeader && cards[v.leader]) {
+    const el = cards[v.leader].el; el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+  }
+  lastLeader = v.leader;
+
+  const ev = (v.events || []).slice(-80).reverse();
+  const key = ev.length ? ev[0].time + ev.length : "";
+  if (key !== lastEventKey) {
+    lastEventKey = key;
+    $("events").innerHTML = ev.length ? ev.map(e => {
+      const c = EVENT_COLOR[e.kind] || "follower";
+      return `<li style="--c: var(--${c})"><time>${fmtTime(e.time)}</time><span class="dot"></span><span class="who">${esc(e.node)}</span>
+        <span class="what"><b>${esc(e.kind)}</b>${e.term ? ` · term ${e.term}` : ""}${e.detail ? ` · ${esc(e.detail)}` : ""}</span></li>`;
+    }).join("") : `<li class="empty">Waiting for events…</li>`;
+  }
+}
+
+async function poll() {
+  try { const r = await api("/api/cluster"); if (r.status === 200) render(r.body); }
+  catch { $("sLeader").innerHTML = "<small>offline</small>"; }
+  setTimeout(poll, 400);
+}
+
+async function act(id, action, btn) {
+  btn.disabled = true;
+  try {
+    const r = await api(`/api/nodes/${id}/${action}`, { method: "POST" });
+    if (r.status !== 200) alert(r.body.error || r.status);
+    const v = await api("/api/cluster"); render(v.body);
+  } finally { btn.disabled = false; }
+}
+
+document.querySelectorAll("[data-op]").forEach(b => b.addEventListener("click", async () => {
+  const raw = $("key").value.trim();
+  if (!raw) return;
+  const op = b.dataset.op;
+  let url = "/api/kv/" + encodeURIComponent(raw), opts = { method: op };
+  if (op === "GET_STALE") { opts.method = "GET"; url += "?consistency=stale"; }
+  if (op === "PUT") opts.body = $("val").value;
+  const out = $("kvOut"), t0 = performance.now();
+  out.textContent = "…";
+  try {
+    const r = await api(url, opts);
+    const ms = (performance.now() - t0).toFixed(1);
+    const good = r.status < 300 || (r.status === 404 && opts.method === "GET");
+    out.innerHTML = `<span class="status ${good ? "ok" : "err"}">${opts.method} ${esc(raw)} → ${r.status}</span> · ${ms} ms\n` + esc(JSON.stringify(r.body, null, 2));
+  } catch (e) { out.innerHTML = `<span class="err">${esc(e)}</span>`; }
+}));
+
+$("bRun").addEventListener("click", async () => {
+  const b = $("bRun"); b.disabled = true; b.textContent = "Running…";
+  ["bTput", "bP50", "bP99", "bErr"].forEach(i => $(i).textContent = "…");
+  try {
+    const q = `ops=${$("bOps").value}&clients=${$("bClients").value}&reads=${$("bReads").value}`;
+    const r = await api("/api/bench?" + q, { method: "POST" });
+    if (r.status !== 200) throw new Error(r.body.error || r.status);
+    $("bTput").textContent = Math.round(r.body.opsPerSec).toLocaleString();
+    $("bP50").textContent = r.body.p50ms.toFixed(1);
+    $("bP99").textContent = r.body.p99ms.toFixed(1);
+    $("bErr").textContent = r.body.errors;
+  } catch (e) {
+    ["bTput", "bP50", "bP99", "bErr"].forEach(i => $(i).textContent = "–");
+    alert("Benchmark failed: " + e.message);
+  }
+  b.disabled = false; b.textContent = "Run benchmark";
+});
+
+poll();
+</script>
+</body>
+</html>

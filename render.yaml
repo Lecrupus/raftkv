@@ -1,0 +1,10 @@
+# Render Blueprint: deploys the self-contained demo (3 Raft nodes + dashboard)
+# as a single free web service. Render injects $PORT.
+services:
+  - type: web
+    name: raftkv
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    autoDeploy: true

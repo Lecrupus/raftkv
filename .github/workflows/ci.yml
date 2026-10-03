@@ -1,0 +1,35 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+      - name: vet
+        run: go vet ./...
+      - name: test (race detector)
+        run: go test -race -count=1 ./...
+      - name: chaos + linearizability (20 seeded runs)
+        run: CHAOS_RUNS=20 go test -count=1 -run 'Chaos' ./raft/ ./kv/
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: build image
+        run: docker build -t raftkv .
+      - name: cluster chaos test
+        run: |
+          docker compose up -d --build
+          ROUNDS=5 ./scripts/chaos.sh
+      - name: logs on failure
+        if: failure()
+        run: docker compose logs --tail 200
