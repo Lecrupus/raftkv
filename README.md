@@ -4,7 +4,10 @@
 
 Run 3–5 nodes that agree on every write. Kill the leader and the cluster elects a new one in ~150–300 ms without losing a single acknowledged write. Partition the network and the minority side stops accepting writes instead of diverging (no split-brain).
 
-**Live demo:** _coming soon_ · [CI](../../actions)
+[![ci](https://github.com/Lecrupus/raftkv/actions/workflows/ci.yml/badge.svg)](https://github.com/Lecrupus/raftkv/actions/workflows/ci.yml)
+
+### ▶ Live demo: **[raftkv-z7ka.onrender.com](https://raftkv-z7ka.onrender.com)**
+Kill the leader, partition nodes, run a benchmark, all in the browser. _(Free hosting sleeps when idle; the first load can take ~30 s.)_
 
 ![dashboard](docs/dashboard.png)
 
@@ -72,6 +75,8 @@ Measured on a laptop (Windows 11, Docker Desktop), 3 nodes in separate container
 
 **Group commit** (16 clients): 248 → 752 ops/s, p99 159 → 35 ms.
 
+**Hosted demo** (Render free tier, whole 3-node cluster on 0.1 vCPU): leader killed → new leader in **148 ms**; leader partitioned → **176 ms**, and the healed node rejoins without forcing a new election (pre-vote).
+
 **Failover:** a new leader is elected **~130–180 ms** after the old one is killed or partitioned (election timeout randomized in 150–300 ms).
 
 **Chaos:** `scripts/chaos.sh` SIGKILLs a random node (often the leader) every round, keeps writing, restarts it, and verifies every acknowledged write through every node: **0 lost writes**. 50 seeded runs of the in-memory chaos and linearizability suites pass.
@@ -88,6 +93,8 @@ CHAOS_RUNS=100 go test -run Chaos ./raft ./kv  # 100 seeded chaos runs each
 - **Does the checker have teeth?** Switching reads to stale local reads makes the checker reject the history on every seed. It catches real consistency bugs, not just crashes.
 
 ## Run it
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Lecrupus/raftkv)
 
 **Demo cluster + dashboard (one process):**
 ```bash
