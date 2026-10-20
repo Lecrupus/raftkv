@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-20T12:00:00Z",
+  "title": "Design System: RaftKV Live Cluster",
+  "extensions": {
+    "colorMeta": {
+      "nm589-leader": { "role": "primary", "displayName": "Sodium 589" },
+      "nm486-follower": { "role": "secondary", "displayName": "H-beta 486" },
+      "nm546-commit": { "role": "secondary", "displayName": "Mercury 546" },
+      "nm615-election": { "role": "secondary", "displayName": "Election 615" },
+      "nm656-down": { "role": "secondary", "displayName": "H-alpha 656" },
+      "nm436-partition": { "role": "secondary", "displayName": "Partition 436" },
+      "nm405-stale": { "role": "secondary", "displayName": "Stale 405" },
+      "ground": { "role": "neutral", "displayName": "Charcoal Ground" },
+      "plate": { "role": "neutral", "displayName": "Ash Plate" },
+      "bone": { "role": "neutral", "displayName": "Bone" }
+    },
+    "typographyMeta": {
+      "readout": { "displayName": "Readout", "purpose": "The five headline numbers." },
+      "legend": { "displayName": "Legend", "purpose": "Every label, axis and panel heading." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "ease-land", "value": "cubic-bezier(0.34, 1.56, 0.64, 1)", "purpose": "A new leader's emission line lands with one damped overshoot (700ms). The only overshoot in the system." },
+      { "name": "state", "value": "150ms", "purpose": "Control hover/border transitions." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one filled control per panel.",
+      "html": "<button class=\"ds-btn-primary\">Put</button>",
+      "css": ".ds-btn-primary { height: 36px; padding: 0 14px; border-radius: 3px; border: 1px solid var(--bone, #e6e1d5); background: var(--bone, #e6e1d5); color: var(--ground, #0d0e0f); font: 500 14px 'Barlow Semi Condensed', sans-serif; letter-spacing: .02em; transition: background-color .15s, border-color .15s; } .ds-btn-primary:hover { background: var(--bone-2, #b0ab9e); border-color: var(--bone-2, #b0ab9e); } .ds-btn-primary:focus-visible { outline: 1px solid var(--nm589, #ffc94a); outline-offset: 2px; }"
+    },
+    {
+      "name": "Destructive Button",
+      "kind": "button",
+      "refersTo": "button-destructive",
+      "description": "Outline with H-alpha ink; isolated from neighbours by a seam.",
+      "html": "<button class=\"ds-btn-destructive\">Kill</button>",
+      "css": ".ds-btn-destructive { height: 32px; padding: 0 12px; border-radius: 3px; border: 1px solid var(--seam-strong, #3a3d42); background: transparent; color: var(--nm656, #ff6460); font: 500 13px 'Barlow Semi Condensed', sans-serif; transition: border-color .15s; } .ds-btn-destructive:hover, .ds-btn-destructive:focus-visible { border-color: var(--nm656, #ff6460); outline: none; }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Ground-coloured well with a legend label.",
+      "html": "<label class=\"ds-field\"><span>Key</span><input value=\"hello\"></label>",
+      "css": ".ds-field { display: grid; gap: 4px; } .ds-field span { font: 500 11px/16px 'Barlow Semi Condensed', sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--bone-3, #8d897d); } .ds-field input { height: 36px; padding: 0 10px; border-radius: 3px; border: 1px solid var(--seam-strong, #3a3d42); background: var(--ground, #0d0e0f); color: var(--bone, #e6e1d5); font: 13px 'JetBrains Mono', monospace; } .ds-field input:focus-visible { border-color: var(--nm589, #ffc94a); outline: none; }"
+    },
+    {
+      "name": "Line glyph",
+      "kind": "custom",
+      "description": "Node state as line form: doubled leader, solid follower, dashed candidate.",
+      "html": "<span class=\"ds-glyphs\"><svg width=\"14\" height=\"20\"><line x1=\"5\" x2=\"5\" y1=\"1\" y2=\"19\" stroke=\"#ffc94a\" stroke-width=\"1.5\"/><line x1=\"9\" x2=\"9\" y1=\"1\" y2=\"19\" stroke=\"#ffc94a\" stroke-width=\"1.5\"/></svg><svg width=\"14\" height=\"20\"><line x1=\"7\" x2=\"7\" y1=\"1\" y2=\"19\" stroke=\"#4fc4e8\" stroke-width=\"1.5\"/></svg><svg width=\"14\" height=\"20\"><line x1=\"7\" x2=\"7\" y1=\"1\" y2=\"19\" stroke=\"#ff9d50\" stroke-width=\"1.5\" stroke-dasharray=\"3 2\"/></svg></span>",
+      "css": ".ds-glyphs { display: inline-flex; gap: 8px; padding: 8px; background: #16171a; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The spectral rail.",
+    "overview": "The cluster is read the way a spectrogram is read: a charcoal continuum crossed by needle-thin bright lines. Each node is a horizontal lane on one shared time rail whose right edge is now; every Raft event lands as a vertical emission line; node state is drawn as line form, never as fill.",
+    "keyCharacteristics": [
+      "Colour exists only as 1–1.5px hairlines and as text ink, never as a filled surface.",
+      "State is line form: doubled = leader, solid = follower, dashed = candidate, dotted = partitioned, struck hatch = down.",
+      "One semi-condensed grotesque; hierarchy by size, weight and tracking, not by a second face.",
+      "Seams, not shadows: every division is a 1px rule."
+    ],
+    "rules": [
+      { "name": "The One Wavelength, One Job Rule", "body": "A wavelength never decorates. If a colour appears, it names a Raft state or an outcome.", "section": "colors" },
+      { "name": "The Doubled Line Rule", "body": "Doubling outranks everything: only the leader (and the next guide step) is ever drawn doubled.", "section": "colors" },
+      { "name": "The Legend Voice Rule", "body": "Labels are always the legend style; never invent a second label size.", "section": "typography" }
+    ],
+    "dos": [
+      "Do print every state as text beside its line form (the glyph is decorative).",
+      "Do show divergence (lag, uncommitted tail) rather than totals that are equal on every node.",
+      "Do label a timed-out write \"not confirmed\" — its outcome is unknown, not failed."
+    ],
+    "donts": [
+      "Don't fill a surface with a wavelength colour.",
+      "Don't add shadows, gradients or rounded cards.",
+      "Don't use alert() or modals for control-API errors; show them inline in a status region."
+    ]
+  }
+}

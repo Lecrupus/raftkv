@@ -4,3 +4,11 @@
 *.test
 *.out
 .claude/
+
+# frontend
+web/node_modules/
+web/test-results/
+web/playwright-report/
+.impeccable/refs/
+.impeccable/review/
+web/*.tsbuildinfo

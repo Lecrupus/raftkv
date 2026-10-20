@@ -19,6 +19,34 @@ jobs:
       - name: chaos + linearizability (20 seeded runs)
         run: CHAOS_RUNS=20 go test -count=1 -run 'Chaos' ./raft/ ./kv/
 
+  web:
+    name: dashboard (build + Playwright)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: build, and fail if the embedded dashboard is stale
+        run: npm run build && git diff --exit-code -- ../cluster/web
+      - run: npx playwright install --with-deps chromium
+      - name: end-to-end against a real 3-node cluster
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: web/playwright-report
+
   docker:
     runs-on: ubuntu-latest
     needs: test

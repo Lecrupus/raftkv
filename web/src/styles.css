@@ -1,0 +1,160 @@
+@import "tailwindcss";
+
+/* Self-hosted, Latin subset, woff2 only: inlined into the single-file build. */
+@font-face { font-family: "Barlow Semi Condensed"; font-weight: 300; font-display: swap; src: url("@fontsource/barlow-semi-condensed/files/barlow-semi-condensed-latin-300-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Semi Condensed"; font-weight: 400; font-display: swap; src: url("@fontsource/barlow-semi-condensed/files/barlow-semi-condensed-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Semi Condensed"; font-weight: 500; font-display: swap; src: url("@fontsource/barlow-semi-condensed/files/barlow-semi-condensed-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Semi Condensed"; font-weight: 600; font-display: swap; src: url("@fontsource/barlow-semi-condensed/files/barlow-semi-condensed-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 400; font-display: swap; src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2") format("woff2"); }
+
+/*
+ * RaftKV tokens: the "spectral rail" world.
+ *
+ * Ground is a charcoal continuum (dark) or its plate negative (light).
+ * Colour exists only as hairlines at seven spectral wavelengths, each with
+ * exactly one job. State is carried by line FORM (solid, doubled, dashed,
+ * dotted, struck) so it never depends on hue alone.
+ *
+ *   nm589 sodium   leader          nm486 H-beta    follower
+ *   nm615 orange   election        nm546 mercury   commit / ok
+ *   nm656 H-alpha  down / error    nm436 indigo    partition
+ *   nm405 violet   stale read
+ */
+:root {
+  color-scheme: light;
+  --ground: #e8e7e2;
+  --continuum: #dedcd5;
+  --plate: #f3f2ee;
+  --seam: #c8c6be;
+  --seam-strong: #a9a69c;
+  --bone: #16171a;
+  --bone-2: #3f3e3a;
+  --bone-3: #5c5a53;
+  --nm405: #6a3fcf;
+  --nm436: #3946c4;
+  --nm486: #0a7398;
+  --nm546: #2c6e17;
+  --nm589: #8a5f00;
+  --nm615: #a84c0c;
+  --nm656: #be2427;
+  --band: 22 23 26;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #0d0e0f;
+    --continuum: #111214;
+    --plate: #16171a;
+    --seam: #26282c;
+    --seam-strong: #3a3d42;
+    --bone: #e6e1d5;
+    --bone-2: #b0ab9e;
+    --bone-3: #8d897d;
+    --nm405: #b993ff;
+    --nm436: #8b96ff;
+    --nm486: #4fc4e8;
+    --nm546: #92dc6e;
+    --nm589: #ffc94a;
+    --nm615: #ff9d50;
+    --nm656: #ff6460;
+    --band: 230 225 213;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0d0e0f;
+  --continuum: #111214;
+  --plate: #16171a;
+  --seam: #26282c;
+  --seam-strong: #3a3d42;
+  --bone: #e6e1d5;
+  --bone-2: #b0ab9e;
+  --bone-3: #8d897d;
+  --nm405: #b993ff;
+  --nm436: #8b96ff;
+  --nm486: #4fc4e8;
+  --nm546: #92dc6e;
+  --nm589: #ffc94a;
+  --nm615: #ff9d50;
+  --nm656: #ff6460;
+  --band: 230 225 213;
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-continuum: var(--continuum);
+  --color-plate: var(--plate);
+  --color-seam: var(--seam);
+  --color-seam-strong: var(--seam-strong);
+  --color-bone: var(--bone);
+  --color-bone-2: var(--bone-2);
+  --color-bone-3: var(--bone-3);
+  --color-nm405: var(--nm405);
+  --color-nm436: var(--nm436);
+  --color-nm486: var(--nm486);
+  --color-nm546: var(--nm546);
+  --color-nm589: var(--nm589);
+  --color-nm615: var(--nm615);
+  --color-nm656: var(--nm656);
+  --font-sans: "Barlow Semi Condensed", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --ease-land: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Legend voice: the world's one small tracked label. */
+@utility legend {
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bone-3);
+}
+
+/* Readout numerals: light, large, tabular. */
+@utility readout {
+  font-size: 34px;
+  line-height: 38px;
+  font-weight: 300;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--bone);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.45;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    caret-color: var(--nm589);
+    scrollbar-color: var(--seam-strong) transparent;
+  }
+  ::selection { background: color-mix(in srgb, var(--nm589) 32%, transparent); color: var(--bone); }
+  :focus-visible { outline: 1px solid var(--nm589); outline-offset: 2px; }
+  a { color: var(--bone); text-decoration-color: var(--seam-strong); text-underline-offset: 3px; }
+  a:hover { text-decoration-color: var(--bone); }
+  input, select { font: inherit; color: inherit; }
+}
+
+/* A new leader's emission line lands on the rail with one damped overshoot. */
+@keyframes land {
+  from { transform: translateX(18px); opacity: 0; }
+  60% { opacity: 1; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.landing { animation: land 700ms var(--ease-land) both; }
+
+/* Continuous heartbeat flow on the leader's doubled trace. */
+@keyframes trace { to { stroke-dashoffset: -24; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .landing { animation: none; }
+  *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; }
+}
